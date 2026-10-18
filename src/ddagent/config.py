@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # "offline" = deterministic rule-based agents (no key, used in CI); "openai" = any OpenAI-compatible LLM
     llm_provider: Literal["offline", "openai"] = "offline"
     llm_base_url: str = "https://api.groq.com/openai/v1"
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "openai/gpt-oss-120b"
     llm_api_key: str = ""
     llm_temperature: float = 0.0
     llm_timeout_s: float = 90.0
