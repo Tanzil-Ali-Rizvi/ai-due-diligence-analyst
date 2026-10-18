@@ -1,0 +1,48 @@
+{
+  "red_flags": [
+    {"id": "RF1", "workstream": "commercial", "severity": "high", "source": "commercial/customer_revenue_fy2026.csv",
+     "keywords": ["concentration", "largest customer", "45"], "description": "Top customer is 45% of revenue"},
+    {"id": "RF2", "workstream": "legal", "severity": "high", "source": "legal/msa_metro_mart_retail.md",
+     "keywords": ["change of control", "change-of-control"], "description": "Key customer can terminate on change of control"},
+    {"id": "RF3", "workstream": "legal", "severity": "high", "source": "legal/litigation_register.md",
+     "keywords": ["litigation", "patent", "paystream", "6.5"], "description": "Pending INR 6.5 cr patent claim, unprovisioned"},
+    {"id": "RF4", "workstream": "financial", "severity": "critical", "source": "financials/management_accounts_summary.md",
+     "keywords": ["reconcile", "overstat", "48", "discrepan", "mismatch"], "description": "Stated revenue 48.0 vs P&L 41.2"},
+    {"id": "RF5", "workstream": "financial", "severity": "high", "source": "financials/monthly_metrics_fy2026.csv",
+     "keywords": ["runway", "burn"], "description": "About 8 months of cash runway"},
+    {"id": "RF6", "workstream": "people", "severity": "medium", "source": "people/key_people.md",
+     "keywords": ["cto", "key-person", "key person", "resign"], "description": "Co-founder CTO resigned, no successor"},
+    {"id": "RF7", "workstream": "compliance", "severity": "high", "source": "compliance/data_protection.md",
+     "keywords": ["breach", "exposed", "notif", "report"], "description": "KYC data exposure not reported to regulators"}
+  ],
+  "decoys": [
+    {"id": "D1", "chunk": "legal/litigation_register.md::1", "keywords": ["wage"], "description": "Closed wage claim"},
+    {"id": "D2", "chunk": "legal/litigation_register.md::2", "keywords": ["gst", "show-cause"], "description": "Dropped GST notice"}
+  ],
+  "metrics": {
+    "revenue_fy2026": 41.2, "revenue_growth_fy2026": 40.1, "gross_margin_fy2026": 66.0, "ebitda_fy2026": -9.3,
+    "runway_months": 8.1, "top1_customer_share": 45.0, "top5_customer_share": 69.0, "stated_vs_ledger_gap": 16.5
+  },
+  "fabricated_findings": [
+    {"title": "Undisclosed debt", "detail": "The company carries INR 200 crore of undisclosed debt.",
+     "citations": ["financials/pnl_fy2024_fy2026.csv::0"], "severity": "critical", "workstream": "financial",
+     "type": "invented number"},
+    {"title": "Extreme concentration", "detail": "The largest customer is 62% of revenue.",
+     "citations": ["commercial/customer_revenue_fy2026.csv::0"], "severity": "high", "workstream": "commercial",
+     "type": "wrong number"},
+    {"title": "Side letter", "detail": "A side letter grants the customer exclusivity.",
+     "citations": ["legal/side_letter.md::0"], "severity": "high", "workstream": "legal",
+     "type": "fake source"},
+    {"title": "Uncited claim", "detail": "The founders have pledged their shares.",
+     "citations": [], "severity": "high", "workstream": "legal", "type": "no citation"},
+    {"title": "CTO notice", "detail": "The CTO is serving a 6-month notice period.",
+     "citations": ["people/key_people.md::1"], "severity": "medium", "workstream": "people",
+     "type": "wrong number"},
+    {"title": "Aggressive preference", "detail": "Series A holds a 3x participating liquidation preference.",
+     "citations": ["corporate/cap_table.csv::0"], "severity": "high", "workstream": "legal",
+     "type": "wrong number"},
+    {"title": "Certification revoked", "detail": "The company's ISO 27001 certification was revoked.",
+     "citations": ["compliance/data_protection.md::1"], "severity": "high", "workstream": "compliance",
+     "type": "semantic contradiction (no numbers)"}
+  ]
+}

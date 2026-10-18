@@ -1,0 +1,87 @@
+{
+  "metrics": {
+    "red_flag_recall": 1.0,
+    "precision": 1.0,
+    "severity_accuracy": 1.0,
+    "decoy_false_alarms": 0,
+    "metric_accuracy": 1.0,
+    "citation_validity": 1.0,
+    "fabrication_catch_rate": 0.857,
+    "findings_reported": 7,
+    "runtime_s": 0.02
+  },
+  "hits": {
+    "RF1": "COM-1",
+    "RF2": "LEG-1",
+    "RF3": "LEG-2",
+    "RF4": "FIN-1",
+    "RF5": "FIN-2",
+    "RF6": "PPL-1",
+    "RF7": "CMP-1"
+  },
+  "unmatched": [],
+  "false_alarms": [],
+  "metric_check": {
+    "revenue_fy2026": true,
+    "revenue_growth_fy2026": true,
+    "gross_margin_fy2026": true,
+    "ebitda_fy2026": true,
+    "runway_months": true,
+    "top1_customer_share": true,
+    "top5_customer_share": true,
+    "stated_vs_ledger_gap": true
+  },
+  "fabrication": {
+    "invented number": "1/1",
+    "wrong number": "3/3",
+    "fake source": "1/1",
+    "no citation": "1/1",
+    "semantic contradiction (no numbers)": "0/1"
+  },
+  "critic_notes": {
+    "Undisclosed debt": "Numbers not found in cited sources: 200.0.",
+    "Extreme concentration": "Numbers not found in cited sources: 62.0.",
+    "Side letter": "Cites unknown source(s): legal/side_letter.md::0.",
+    "Uncited claim": "No citations.",
+    "CTO notice": "Numbers not found in cited sources: 6.0.",
+    "Aggressive preference": "Numbers not found in cited sources: 3.0.",
+    "Certification revoked": "Citations resolve and all numbers are grounded."
+  },
+  "trace": [
+    {
+      "step": "planner",
+      "ms": 0.0,
+      "workstreams": 5,
+      "queries": 13
+    },
+    {
+      "step": "researcher",
+      "ms": 2.1,
+      "evidence_chunks": 35,
+      "metrics": 11
+    },
+    {
+      "step": "analyst",
+      "ms": 0.8,
+      "findings": 7
+    },
+    {
+      "step": "critic",
+      "ms": 0.4,
+      "verified": 7,
+      "rejected": 0
+    },
+    {
+      "step": "human_review",
+      "approved": 7,
+      "reviewer": "auto"
+    },
+    {
+      "step": "memo_writer",
+      "ms": 0.1,
+      "approved": 7
+    }
+  ],
+  "llm": "offline rules",
+  "usage": {}
+}
