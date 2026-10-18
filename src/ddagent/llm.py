@@ -37,7 +37,15 @@ class JSONChatLLM:
                 if r.status_code == 429 and attempt < retries:
                     time.sleep(float(r.headers.get("retry-after", 5)))
                     continue
-                r.raise_for_status()
+                if r.status_code >= 400:
+                    # Surface the provider's own message (e.g. "model not found", "invalid API key").
+                    try:
+                        detail = r.json().get("error", {}).get("message", r.text)
+                    except ValueError:
+                        detail = r.text
+                    if r.status_code in (400, 401, 403, 404):
+                        raise LLMError(f"{self._model}: HTTP {r.status_code}: {str(detail)[:300]}")
+                    r.raise_for_status()
                 data = r.json()
                 for k in ("prompt_tokens", "completion_tokens"):
                     self.usage[k] += int((data.get("usage") or {}).get(k, 0))
