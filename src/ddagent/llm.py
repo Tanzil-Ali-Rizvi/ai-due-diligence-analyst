@@ -59,7 +59,8 @@ def _parse_json(text: str) -> dict:
 
 
 def build_llm(settings) -> JSONChatLLM | None:
-    if settings.llm_provider == "openai":
+    """LLM client for "openai" mode; None (offline rules) otherwise or when no key is configured."""
+    if settings.llm_provider == "openai" and settings.llm_api_key:
         return JSONChatLLM(
             settings.llm_base_url,
             settings.llm_model,
