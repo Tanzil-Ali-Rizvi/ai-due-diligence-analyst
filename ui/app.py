@@ -17,9 +17,13 @@ from ddagent.tools import fmt  # noqa: E402
 st.set_page_config(page_title="AI Due-Diligence Analyst", page_icon="🔎", layout="wide")
 
 SEV_ICON = {"critical": "🟥", "high": "🟧", "medium": "🟨", "low": "⬜"}
-KEY_METRICS = [("revenue_fy2026", "Revenue FY26 (P&L)"), ("stated_revenue_fy2026", "Revenue claimed"),
-               ("revenue_growth_fy2026", "YoY growth"), ("runway_months", "Cash runway"),
-               ("top1_customer_share", "Top customer share")]
+KEY_METRICS = [
+    ("revenue_fy2026", "Revenue FY26 (P&L)"),
+    ("stated_revenue_fy2026", "Revenue claimed"),
+    ("revenue_growth_fy2026", "YoY growth"),
+    ("runway_months", "Cash runway"),
+    ("top1_customer_share", "Top customer share"),
+]
 
 
 @st.cache_resource(show_spinner=False)
@@ -56,12 +60,16 @@ with st.sidebar:
         st.rerun()
 
 st.title("🔎 AI Due-Diligence Analyst")
-st.caption("Planner → Researcher → Financial Analyst → Critic → **You** → Memo writer. "
-           "Numbers come from deterministic tools; every claim must cite the data room.")
+st.caption(
+    "Planner → Researcher → Financial Analyst → Critic → **You** → Memo writer. "
+    "Numbers come from deterministic tools; every claim must cite the data room."
+)
 
 if "paused" not in ss:
-    st.info(f"Target: **{COMPANY}**, raising a Series B of INR 120 crore. "
-            "Browse the data room on the left, then run the agents.")
+    st.info(
+        f"Target: **{COMPANY}**, raising a Series B of INR 120 crore. "
+        "Browse the data room on the left, then run the agents."
+    )
     if st.button("▶ Run due diligence", type="primary"):
         with st.status("Agents at work ...", expanded=True) as status:
             try:
