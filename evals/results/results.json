@@ -56,13 +56,13 @@
     },
     {
       "step": "researcher",
-      "ms": 2.1,
-      "evidence_chunks": 35,
+      "ms": 1.9,
+      "evidence_chunks": 20,
       "metrics": 11
     },
     {
       "step": "analyst",
-      "ms": 0.8,
+      "ms": 0.6,
       "findings": 7
     },
     {

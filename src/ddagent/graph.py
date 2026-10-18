@@ -85,7 +85,7 @@ class DueDiligenceAgent:
             findings += agents.analyse(
                 ws,
                 state["evidence"].get(ws, []),
-                state["metrics"],
+                self._metrics_for(ws, state["metrics"]),
                 self.llm,
                 feedback=rejected.get(ws) or None,
                 max_evidence=self.settings.max_evidence_per_workstream,
@@ -95,6 +95,10 @@ class DueDiligenceAgent:
             "revisions": state.get("revisions", 0) + (1 if prev else 0),
             "trace": self._log(state, "analyst", t0, findings=len(findings)),
         }
+
+    def _metrics_for(self, ws: str, metrics: list[Metric]) -> list[Metric]:
+        """Give each analyst only the metrics computed from its own workstream's documents."""
+        return [m for m in metrics if any((c := self.dataroom.get(s)) and c.workstream == ws for s in m.sources)]
 
     def n_critique(self, state: DDState) -> DDState:
         t0 = time.perf_counter()

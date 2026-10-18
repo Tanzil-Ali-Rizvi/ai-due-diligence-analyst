@@ -82,7 +82,7 @@ def research(dataroom: DataRoom, plan_items: list[PlanItem], k: int = 4) -> dict
         seen = {c.chunk_id for c in evidence.get(item.workstream, [])}
         bucket = evidence.setdefault(item.workstream, [])
         for q in item.queries:
-            for c in dataroom.search(q, k=k):
+            for c in dataroom.search(q, k=k, workstream=item.workstream):
                 if c.chunk_id not in seen:
                     bucket.append(c)
                     seen.add(c.chunk_id)
@@ -92,13 +92,28 @@ def research(dataroom: DataRoom, plan_items: list[PlanItem], k: int = 4) -> dict
 # ------------------------------------------------------------------------------------------- analyst
 
 ANALYST_SYSTEM = """You are a sceptical due-diligence analyst for a venture investor. From the EVIDENCE and the
-pre-computed METRICS, report only material risks (red flags) for the given workstream.
+pre-computed METRICS, report the material risks (red flags) for ONE workstream.
+
+Workstream scope (report only issues in yours; other analysts cover the rest):
+- financial: accuracy of reported numbers, revenue quality, profitability, cash and runway
+- commercial: customers, concentration, retention, pricing, market claims
+- legal: litigation, contingent liabilities, contract clauses, cap table and investor rights
+- people: founders, key-person dependency, leadership, retention
+- compliance: data protection, security incidents, regulatory obligations
+
+Severity rubric:
+- critical: possible misstatement of financials or fraud; on its own would stop the deal
+- high: material risk that needs a deal condition, indemnity or price change
+- medium: notable risk to monitor or address after closing
+- low: minor
 
 Rules:
-- Every finding must cite one or more evidence ids exactly as given (e.g. "legal/msa.md::4").
-- Every number you write must appear in the cited evidence or in a cited metric. Never do arithmetic yourself.
+- Report at most 3 findings, most material first. Skip routine items (e.g. an audit or certification still in
+  progress, standard contract terms) unless the evidence shows something abnormal.
 - Do NOT report matters that are closed, settled, resolved or dropped.
-- Severity: critical (deal-breaking or possible misstatement), high, medium, low.
+- Every finding must cite one or more evidence ids exactly as given (e.g. "legal/msa.md::4").
+- Every number you write must appear in the cited evidence or a metric. Never do arithmetic yourself; when you
+  use a metric, also cite the evidence id(s) listed in its sources.
 - If there are no material risks, return an empty list.
 Return JSON: {"findings": [{"title": str, "detail": str, "severity": str, "citations": [ids]}]}"""
 
@@ -118,7 +133,7 @@ def analyse(
     if llm is None:
         return _rule_based_findings(workstream, evidence, metrics)
     ev = "\n\n".join(
-        f'<evidence id="{c.chunk_id}" title="{c.title} > {c.section}">\n{c.text[:900]}\n</evidence>'
+        f'<evidence id="{c.chunk_id}" title="{c.title} > {c.section}">\n{c.text[:1600]}\n</evidence>'
         for c in evidence[:max_evidence]
     )
     prompt = f"WORKSTREAM: {workstream}\n\nMETRICS:\n{_metric_lines(metrics)}\n\nEVIDENCE:\n{ev}"
@@ -141,6 +156,17 @@ def analyse(
             )
         )
     return findings
+
+
+def dedupe(findings: list[Finding]) -> list[Finding]:
+    """Drop a finding whose citations are a subset of a more severe (or earlier) finding's citations."""
+    kept: list[Finding] = []
+    for f in sorted(findings, key=lambda x: SEVERITY_ORDER[x.severity]):
+        if any(f.citations and set(f.citations) <= set(k.citations) for k in kept):
+            continue
+        kept.append(f)
+    order = {f.finding_id: i for i, f in enumerate(findings)}
+    return sorted(kept, key=lambda f: order[f.finding_id])
 
 
 def _find(evidence: list[Chunk], *patterns: str) -> list[Chunk]:
@@ -256,7 +282,8 @@ def _numbers(text: str) -> set[float]:
 
 
 CRITIC_SYSTEM = """You verify due-diligence findings. For each FINDING you get the exact SOURCE text it cites.
-Decide whether those sources directly support the claim (not merely mention the topic). Be strict: a claim that
+Decide whether those sources, together with any verified tool metrics computed from them, directly support the
+claim (not merely mention the topic). Be strict: a claim that
 contradicts or goes beyond its sources is unsupported.
 Return JSON: {"verdicts": [{"id": str, "supported": true|false, "reason": str}]} with one verdict per finding."""
 
@@ -295,8 +322,13 @@ def critique(findings: list[Finding], dataroom: DataRoom, metrics: list[Metric],
     if pending:  # one batched LLM call for all semantic checks (saves tokens and rate limit)
         blocks = []
         for f in pending:
-            src = "\n".join(f"[{c}] {dataroom.get(c).text[:900]}" for c in f.citations)
-            blocks.append(f"FINDING {f.finding_id}: {f.title}. {f.detail}\nSOURCES:\n{src}")
+            src = "\n".join(f"[{c}] {dataroom.get(c).text[:1600]}" for c in f.citations)
+            used = [m for m in metrics if set(m.sources) & set(f.citations)]
+            tool = "\n".join(f"- {m.name} = {fmt(m)} ({m.formula})" for m in used) or "- none"
+            blocks.append(
+                f"FINDING {f.finding_id}: {f.title}. {f.detail}\nSOURCES:\n{src}\n"
+                f"VERIFIED TOOL METRICS computed by code from these sources (treat as correct):\n{tool}"
+            )
         out = llm.json(CRITIC_SYSTEM, "\n\n---\n\n".join(blocks))
         verdicts = {str(v.get("id")): v for v in out.get("verdicts", []) if isinstance(v, dict)}
         for f in pending:

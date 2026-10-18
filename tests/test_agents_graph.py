@@ -111,3 +111,11 @@ def test_llm_mode_plans_revises_after_critic_and_writes_memo(settings):
     # the planner's single workstream was topped up with the default plan for the other four
     assert len(state["plan"]) == 5
     json.dumps(state["trace"])  # trace is serialisable for the UI
+
+
+def test_dedupe_keeps_the_most_severe_of_overlapping_findings():
+    mk = lambda i, sev, cites: Finding(  # noqa: E731
+        finding_id=i, workstream="legal", severity=sev, title=i, detail="d", citations=cites
+    )
+    out = agents.dedupe([mk("A", "medium", ["x::0"]), mk("B", "high", ["x::0", "y::1"]), mk("C", "low", ["z::0"])])
+    assert [f.finding_id for f in out] == ["B", "C"]
