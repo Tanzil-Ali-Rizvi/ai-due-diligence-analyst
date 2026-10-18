@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_temperature: float = 0.0
     llm_timeout_s: float = 90.0
+    llm_reasoning_effort: str = "low"
+    max_evidence_per_workstream: int = 8
     search_k: int = 4
     max_revisions: int = 1
 

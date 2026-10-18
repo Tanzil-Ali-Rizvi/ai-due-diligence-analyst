@@ -14,28 +14,45 @@ class LLMError(RuntimeError):
 
 
 class JSONChatLLM:
-    def __init__(self, base_url: str, model: str, api_key: str, temperature: float = 0.0, timeout_s: float = 90.0):
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str,
+        temperature: float = 0.0,
+        timeout_s: float = 90.0,
+        reasoning_effort: str | None = None,
+        max_wait_s: float = 60.0,
+    ):
         if not api_key:
             raise LLMError("DD_LLM_API_KEY is not set")
         self.name = model
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._model, self._temperature, self._timeout = model, temperature, timeout_s
-        self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}
+        self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0, "rate_limit_waits": 0}
+        # Reasoning models (e.g. gpt-oss) accept an effort level; "low" saves many hidden tokens.
+        self._reasoning_effort = reasoning_effort if reasoning_effort and "gpt-oss" in model else None
+        self._max_wait = max_wait_s
 
-    def json(self, system: str, user: str, retries: int = 2) -> dict:
+    def json(self, system: str, user: str, retries: int = 6) -> dict:
         payload = {
             "model": self._model,
             "temperature": self._temperature,
             "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
+        if self._reasoning_effort:
+            payload["reasoning_effort"] = self._reasoning_effort
         last: Exception | None = None
         for attempt in range(retries + 1):
             try:
                 r = httpx.post(self._url, json=payload, headers=self._headers, timeout=self._timeout)
-                if r.status_code == 429 and attempt < retries:
-                    time.sleep(float(r.headers.get("retry-after", 5)))
+                if r.status_code in (429, 503) and attempt < retries:
+                    # Free tiers cap tokens per minute: wait as long as the provider asks, then retry.
+                    wait = min(float(r.headers.get("retry-after") or 2 ** (attempt + 2)), self._max_wait)
+                    self.usage["rate_limit_waits"] += 1
+                    time.sleep(wait)
                     continue
                 if r.status_code >= 400:
                     # Surface the provider's own message (e.g. "model not found", "invalid API key").
@@ -75,5 +92,6 @@ def build_llm(settings) -> JSONChatLLM | None:
             settings.llm_api_key,
             settings.llm_temperature,
             settings.llm_timeout_s,
+            settings.llm_reasoning_effort,
         )
     return None

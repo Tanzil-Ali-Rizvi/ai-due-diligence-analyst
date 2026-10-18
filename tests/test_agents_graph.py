@@ -1,6 +1,7 @@
 """Graph behaviour, the critic, human-in-the-loop, and the LLM code paths via a scripted fake LLM."""
 
 import json
+import re
 
 from ddagent import agents
 from ddagent.evaluation import check_gates, evaluate
@@ -91,7 +92,8 @@ class ScriptedLLM:
                 ]
             }
         if "verify due-diligence findings" in system:
-            return {"supported": True, "reason": "matches the table"}
+            ids = re.findall(r"FINDING (\S+):", user)
+            return {"verdicts": [{"id": i, "supported": True, "reason": "matches the table"} for i in ids]}
         if "executive summary" in system:
             return {"summary": "One high-severity concentration risk."}
         raise AssertionError(system)

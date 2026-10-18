@@ -37,6 +37,14 @@ def load_agent() -> DueDiligenceAgent:
     return agent
 
 
+@st.cache_resource(show_spinner=False)
+def offline_agent() -> DueDiligenceAgent:
+    from ddagent.config import Settings
+
+    root = Path(__file__).resolve().parents[1]
+    return DueDiligenceAgent(Settings(dataroom_dir=root / "data" / "dataroom", llm_provider="offline"))
+
+
 agent = load_agent()
 ss = st.session_state
 ss.setdefault("thread", str(uuid.uuid4()))
@@ -54,7 +62,7 @@ with st.sidebar:
     st.divider()
     st.caption(f"Mode: {mode}")
     if st.button("↺ Start over", use_container_width=True):
-        for k in ("paused", "final"):
+        for k in ("paused", "final", "offline", "agent_mode", "llm_error"):
             ss.pop(k, None)
         ss.thread = str(uuid.uuid4())
         st.rerun()
@@ -70,16 +78,37 @@ if "paused" not in ss:
         f"Target: **{COMPANY}**, raising a Series B of INR 120 crore. "
         "Browse the data room on the left, then run the agents."
     )
-    if st.button("▶ Run due diligence", type="primary"):
-        with st.status("Agents at work ...", expanded=True) as status:
+    STEP_LABEL = {
+        "plan": "🧭 Planner wrote the diligence checklist",
+        "research": "🔍 Researcher gathered evidence; tools computed the metrics",
+        "analyse": "📊 Analyst drafted findings",
+        "critique": "🛡️ Critic checked every citation and number",
+    }
+    use_offline = ss.get("offline", False)
+    run_agent = offline_agent() if use_offline else agent
+    label = "▶ Run due diligence" + (" (offline mode)" if use_offline else "")
+    if ss.get("llm_error") and not use_offline:
+        st.error(f"LLM unavailable: {ss.llm_error}")
+        st.caption(
+            "Free LLM tiers allow a limited number of tokens per minute. Wait a minute and retry, "
+            "or run with the deterministic offline agents."
+        )
+        if st.button("Use offline mode instead"):
+            ss.offline = True
+            ss.pop("llm_error")
+            st.rerun()
+    if st.button(label, type="primary"):
+        with st.status("Agents at work ... (free LLM tiers can take 1-2 minutes)", expanded=True) as status:
             try:
-                ss.paused = agent.start(ss.thread)
+                for node in run_agent.stream_start(ss.thread):
+                    st.write(STEP_LABEL.get(node, node))
             except LLMError as exc:
-                status.update(label="LLM unavailable", state="error")
-                st.error(f"{exc}. Try again in a minute (free-tier rate limit) or run offline.")
-                st.stop()
-            for t in ss.paused["trace"]:
-                st.write(f"✓ **{t['step']}** · " + ", ".join(f"{k}: {v}" for k, v in t.items() if k != "step"))
+                ss.llm_error = str(exc)
+                ss.thread = str(uuid.uuid4())
+                st.rerun()
+            ss.pop("llm_error", None)
+            ss.paused = run_agent.state(ss.thread)
+            ss.agent_mode = "offline" if use_offline else "llm"
             status.update(label="Analysis complete: your review is needed", state="complete", expanded=False)
         st.rerun()
     st.stop()
@@ -119,7 +148,8 @@ if "final" not in ss:
                 st.markdown(f"**{f.title}**: {f.detail}  \n_Critic:_ {f.critic_note}")
     if st.button(f"✅ Approve {len(approved)} finding(s) and write memo", type="primary"):
         with st.spinner("Writing memo ..."):
-            ss.final = agent.resume(ss.thread, approved, reviewer="streamlit-user")
+            run_agent = offline_agent() if ss.get("agent_mode") == "offline" else agent
+            ss.final = run_agent.resume(ss.thread, approved, reviewer="streamlit-user")
         st.rerun()
 else:
     st.subheader("📄 Investment memo")

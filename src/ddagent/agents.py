@@ -108,12 +108,18 @@ def _metric_lines(metrics: list[Metric]) -> str:
 
 
 def analyse(
-    workstream: str, evidence: list[Chunk], metrics: list[Metric], llm=None, feedback: list[Finding] | None = None
+    workstream: str,
+    evidence: list[Chunk],
+    metrics: list[Metric],
+    llm=None,
+    feedback: list[Finding] | None = None,
+    max_evidence: int = 8,
 ) -> list[Finding]:
     if llm is None:
         return _rule_based_findings(workstream, evidence, metrics)
     ev = "\n\n".join(
-        f'<evidence id="{c.chunk_id}" title="{c.title} > {c.section}">\n{c.text}\n</evidence>' for c in evidence
+        f'<evidence id="{c.chunk_id}" title="{c.title} > {c.section}">\n{c.text[:900]}\n</evidence>'
+        for c in evidence[:max_evidence]
     )
     prompt = f"WORKSTREAM: {workstream}\n\nMETRICS:\n{_metric_lines(metrics)}\n\nEVIDENCE:\n{ev}"
     if feedback:
@@ -249,8 +255,10 @@ def _numbers(text: str) -> set[float]:
     return vals
 
 
-CRITIC_SYSTEM = """You verify due-diligence findings. Given a FINDING and the exact SOURCE text it cites, answer
-whether the sources directly support the finding's claim. Return JSON: {"supported": true|false, "reason": str}."""
+CRITIC_SYSTEM = """You verify due-diligence findings. For each FINDING you get the exact SOURCE text it cites.
+Decide whether those sources directly support the claim (not merely mention the topic). Be strict: a claim that
+contradicts or goes beyond its sources is unsupported.
+Return JSON: {"verdicts": [{"id": str, "supported": true|false, "reason": str}]} with one verdict per finding."""
 
 
 def critique(findings: list[Finding], dataroom: DataRoom, metrics: list[Metric], llm=None) -> list[Finding]:
@@ -279,14 +287,27 @@ def critique(findings: list[Finding], dataroom: DataRoom, metrics: list[Metric],
                 f.status = "rejected"
                 f.critic_note = f"Numbers not found in cited sources: {', '.join(map(str, unsupported))}."
             elif llm is not None:
-                src = "\n\n".join(f"[{c.chunk_id}]\n{c.text}" for c in cited)
-                verdict = llm.json(CRITIC_SYSTEM, f"FINDING: {f.title}. {f.detail}\n\nSOURCES:\n{src}")
-                ok = bool(verdict.get("supported"))
-                f.status = "verified" if ok else "rejected"
-                f.critic_note = str(verdict.get("reason", ""))[:300]
+                f.status, f.critic_note = "proposed", ""  # numeric checks passed; semantic check below
             else:
                 f.status, f.critic_note = "verified", "Citations resolve and all numbers are grounded."
         checked.append(f)
+    pending = [f for f in checked if f.status == "proposed"]
+    if pending:  # one batched LLM call for all semantic checks (saves tokens and rate limit)
+        blocks = []
+        for f in pending:
+            src = "\n".join(f"[{c}] {dataroom.get(c).text[:900]}" for c in f.citations)
+            blocks.append(f"FINDING {f.finding_id}: {f.title}. {f.detail}\nSOURCES:\n{src}")
+        out = llm.json(CRITIC_SYSTEM, "\n\n---\n\n".join(blocks))
+        verdicts = {str(v.get("id")): v for v in out.get("verdicts", []) if isinstance(v, dict)}
+        for f in pending:
+            v = verdicts.get(f.finding_id)
+            if v is None:
+                f.status, f.critic_note = "rejected", "Critic returned no verdict."
+            else:
+                supported = v.get("supported")
+                ok = supported is True or str(supported).strip().lower() == "true"
+                f.status = "verified" if ok else "rejected"
+                f.critic_note = str(v.get("reason", ""))[:300]
     return checked
 
 

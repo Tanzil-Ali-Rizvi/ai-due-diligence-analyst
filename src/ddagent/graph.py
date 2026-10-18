@@ -83,7 +83,12 @@ class DueDiligenceAgent:
                 findings += [f for f in prev if f.workstream == ws]
                 continue
             findings += agents.analyse(
-                ws, state["evidence"].get(ws, []), state["metrics"], self.llm, feedback=rejected.get(ws) or None
+                ws,
+                state["evidence"].get(ws, []),
+                state["metrics"],
+                self.llm,
+                feedback=rejected.get(ws) or None,
+                max_evidence=self.settings.max_evidence_per_workstream,
             )
         return {
             "findings": findings,
@@ -166,6 +171,18 @@ class DueDiligenceAgent:
         cfg = {"configurable": {"thread_id": thread_id}}
         self.graph.invoke({}, cfg)
         return self.graph.get_state(cfg).values
+
+    def stream_start(self, thread_id: str):
+        """Like start(), but yields each finished step so a UI can show live progress."""
+        cfg = {"configurable": {"thread_id": thread_id}}
+        for update in self.graph.stream({}, cfg, stream_mode="updates"):
+            for node in update:
+                if node != "__interrupt__":
+                    yield node
+        return self.graph.get_state(cfg).values
+
+    def state(self, thread_id: str) -> dict:
+        return self.graph.get_state({"configurable": {"thread_id": thread_id}}).values
 
     def resume(self, thread_id: str, approved: list[str], reviewer: str = "analyst") -> dict:
         cfg = {"configurable": {"thread_id": thread_id}}
